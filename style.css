@@ -1458,8 +1458,67 @@ select.form-control {
 }
 
 .calendar-day.has-tasks {
-  background-color: var(--color-bg-3);
-  border: 2px solid var(--color-success);
+  position: relative;
+}
+
+.calendar-day.has-tasks::after {
+  content: '✓';
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 10px;
+  color: var(--color-success);
+  font-weight: bold;
+}
+
+.calendar-day.has-exams {
+  position: relative;
+}
+
+.calendar-day.has-exams::before {
+  content: '🏥';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 24px;
+}
+
+.calendar-day.has-pending-tasks::after {
+  content: '📋';
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.calendar-day.has-in-progress-tasks::after {
+  content: '🔄';
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.calendar-day.has-tasks.has-exams,
+.calendar-day.has-pending-tasks.has-exams,
+.calendar-day.has-in-progress-tasks.has-exams {
+  background-color: var(--color-bg-7);
+  border: 2px solid rgba(236, 72, 153, 0.6);
+}
+
+.calendar-day.has-pending-tasks.has-in-progress-tasks::after {
+  content: '📋🔄';
+  font-size: 9px;
+  bottom: 1px;
+  right: 1px;
+  left: auto;
+}
+
+.calendar-day.multiple-indicators {
+  position: relative;
+  padding: var(--space-2);
 }
 
 .calendar-day.other-month {
@@ -1638,8 +1697,8 @@ select.form-control {
 }
 
 .exam-card {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-card-border);
+  background-color: var(--color-bg-7);
+  border: 2px solid rgba(236, 72, 153, 0.5);
   border-radius: var(--radius-lg);
   padding: var(--space-16);
   box-shadow: var(--shadow-sm);
@@ -1650,6 +1709,15 @@ select.form-control {
   font-weight: var(--font-weight-semibold);
   margin-bottom: var(--space-12);
   color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.exam-icon-large {
+  font-size: 48px;
+  line-height: 1;
+  display: inline-block;
 }
 
 .exam-info {
@@ -2002,6 +2070,19 @@ select.form-control {
   .quick-task-inputs {
     grid-template-columns: 1fr;
   }
+  
+  .pomodoro-container {
+    min-height: 400px;
+  }
+  
+  .pomodoro-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .btn-pomodoro {
+    width: 100%;
+  }
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
@@ -2049,8 +2130,8 @@ select.form-control {
 }
 
 .upcoming-exam-card {
-  background-color: var(--color-bg-5);
-  border: 2px solid var(--color-primary);
+  background-color: var(--color-bg-7);
+  border: 2px solid rgba(236, 72, 153, 0.6);
   border-radius: var(--radius-lg);
   padding: var(--space-16);
   margin-bottom: var(--space-12);
@@ -2087,10 +2168,10 @@ select.form-control {
   align-items: start;
 }
 
-/* Desktop: garantir 3 colunas lado a lado */
-@media (min-width: 1025px) {
+/* Mobile: empilhar verticalmente */
+@media (max-width: 768px) {
   .tasks-dashboard {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 1fr !important;
   }
 }
 
@@ -2098,6 +2179,13 @@ select.form-control {
 @media (min-width: 769px) and (max-width: 1024px) {
   .tasks-dashboard {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Desktop: garantir 3 colunas lado a lado */
+@media (min-width: 1025px) {
+  .tasks-dashboard {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -2203,3 +2291,137 @@ select.form-control {
   flex-wrap: wrap;
 }
 
+/* Pomodoro Timer Styles */
+.pomodoro-container {
+  position: relative;
+  width: 100%;
+  min-height: 500px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-image: url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1600&q=80');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: var(--shadow-lg);
+}
+
+.pomodoro-container.timer-running {
+  animation: subtleGlow 3s ease-in-out infinite;
+}
+
+@keyframes subtleGlow {
+  0%, 100% {
+    box-shadow: var(--shadow-lg);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(var(--color-primary-rgb, 33, 128, 141), 0.3), var(--shadow-lg);
+  }
+}
+
+.pomodoro-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-24);
+}
+
+.pomodoro-content {
+  text-align: center;
+  width: 100%;
+  max-width: 600px;
+}
+
+.pomodoro-mode-indicator {
+  margin-bottom: var(--space-24);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-white);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  padding: var(--space-12) var(--space-24);
+  background: rgba(var(--color-teal-500-rgb), 0.8);
+  border-radius: var(--radius-full);
+  display: inline-block;
+}
+
+.pomodoro-mode-indicator.break-mode {
+  background: rgba(var(--color-warning-rgb, 168, 75, 47), 0.8);
+}
+
+.pomodoro-timer-display {
+  margin-bottom: var(--space-32);
+}
+
+.timer-text {
+  font-size: 96px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-white);
+  text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.7);
+  font-family: var(--font-family-mono);
+  line-height: 1;
+  letter-spacing: 0.05em;
+}
+
+@media (max-width: 768px) {
+  .timer-text {
+    font-size: 64px;
+  }
+}
+
+.pomodoro-controls {
+  display: flex;
+  gap: var(--space-16);
+  justify-content: center;
+  margin-bottom: var(--space-24);
+  flex-wrap: wrap;
+}
+
+.btn-pomodoro {
+  min-width: 140px;
+  padding: var(--space-16) var(--space-24);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: var(--shadow-md);
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.btn-pomodoro:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-pomodoro:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .btn-pomodoro {
+    min-width: 120px;
+    padding: var(--space-12) var(--space-16);
+    font-size: var(--font-size-base);
+  }
+}
+
+.pomodoro-info {
+  background: rgba(var(--color-surface-rgb, 255, 255, 255), 0.9);
+  padding: var(--space-16);
+  border-radius: var(--radius-base);
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+[data-color-scheme="dark"] .pomodoro-info {
+  background: rgba(var(--color-charcoal-800-rgb, 38, 40, 40), 0.9);
+}
+
+@media (prefers-color-scheme: dark) {
+  .pomodoro-info {
+    background: rgba(38, 40, 40, 0.9);
+  }
+}

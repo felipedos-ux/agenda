@@ -24,7 +24,22 @@ const app = {
       enableNotifications: true,
       notificationTime: 15
     },
-    timers: {}
+    timers: {},
+    pomodoro: {
+      focusTime: 25, // minutes
+      breakTime: 5, // minutes
+      currentTime: 25 * 60, // seconds
+      isRunning: false,
+      isPaused: false,
+      mode: 'focus', // 'focus' or 'break'
+      intervalId: null,
+      audio: {
+        enabled: true,
+        volume: 0.7,
+        currentSource: 'bluenoise',
+        isPlaying: false
+      }
+    }
   },
 
   // Initialize app
@@ -38,6 +53,7 @@ const app = {
     this.checkNotifications();
     setInterval(() => this.checkNotifications(), 60000); // Check every minute
     this.updateAllTimers();
+    this.initPomodoro();
   },
 
   // Set default dates to today (using local time to avoid timezone issues)
@@ -164,6 +180,8 @@ const app = {
       this.renderExams();
     } else if (tabName === 'projetos') {
       this.renderProjects();
+    } else if (tabName === 'foco') {
+      this.updatePomodoroDisplay();
     }
   },
 
@@ -231,11 +249,16 @@ const app = {
     for (let day = 1; day <= daysInMonth; day++) {
       const currentDate = new Date(year, month, day);
       const isToday = today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
-      const hasTasks = this.hasTasksOnDate(currentDate);
+      const hasPendingTasks = this.hasPendingTasksOnDate(currentDate);
+      const hasInProgressTasks = this.hasInProgressTasksOnDate(currentDate);
+      const hasExams = this.hasExamsOnDate(currentDate);
       
       let classes = 'calendar-day';
       if (isToday) classes += ' today';
-      if (hasTasks) classes += ' has-tasks';
+      if (hasPendingTasks) classes += ' has-pending-tasks';
+      if (hasInProgressTasks) classes += ' has-in-progress-tasks';
+      if (hasExams) classes += ' has-exams';
+      if ((hasPendingTasks || hasInProgressTasks) && hasExams) classes += ' multiple-indicators';
 
       html += `<div class="${classes}">${day}</div>`;
     }
@@ -274,11 +297,16 @@ const app = {
       const currentDate = new Date(startOfWeek);
       currentDate.setDate(startOfWeek.getDate() + i);
       const isToday = this.isToday(currentDate);
-      const hasTasks = this.hasTasksOnDate(currentDate);
+      const hasPendingTasks = this.hasPendingTasksOnDate(currentDate);
+      const hasInProgressTasks = this.hasInProgressTasksOnDate(currentDate);
+      const hasExams = this.hasExamsOnDate(currentDate);
       
       let classes = 'calendar-day';
       if (isToday) classes += ' today';
-      if (hasTasks) classes += ' has-tasks';
+      if (hasPendingTasks) classes += ' has-pending-tasks';
+      if (hasInProgressTasks) classes += ' has-in-progress-tasks';
+      if (hasExams) classes += ' has-exams';
+      if ((hasPendingTasks || hasInProgressTasks) && hasExams) classes += ' multiple-indicators';
 
       html += `
         <div style="text-align: center; padding: var(--space-12);">
@@ -329,6 +357,35 @@ const app = {
       return taskDate.getDate() === date.getDate() &&
              taskDate.getMonth() === date.getMonth() &&
              taskDate.getFullYear() === date.getFullYear();
+    });
+  },
+
+  hasPendingTasksOnDate(date) {
+    return this.state.tasks.some(task => {
+      if (task.status !== 'pendente') return false;
+      const taskDate = this.parseLocalDate(task.date);
+      return taskDate.getDate() === date.getDate() &&
+             taskDate.getMonth() === date.getMonth() &&
+             taskDate.getFullYear() === date.getFullYear();
+    });
+  },
+
+  hasInProgressTasksOnDate(date) {
+    return this.state.tasks.some(task => {
+      if (task.status !== 'andamento') return false;
+      const taskDate = this.parseLocalDate(task.date);
+      return taskDate.getDate() === date.getDate() &&
+             taskDate.getMonth() === date.getMonth() &&
+             taskDate.getFullYear() === date.getFullYear();
+    });
+  },
+
+  hasExamsOnDate(date) {
+    return this.state.exams.some(exam => {
+      const examDate = this.parseLocalDate(exam.date);
+      return examDate.getDate() === date.getDate() &&
+             examDate.getMonth() === date.getMonth() &&
+             examDate.getFullYear() === date.getFullYear();
     });
   },
 
@@ -743,6 +800,32 @@ const app = {
     this.renderShoppingList();
   },
 
+  editShoppingItem(type, itemId) {
+    const item = this.state.shoppingLists[type].find(i => i.id === itemId);
+    if (!item) return;
+
+    const newName = prompt('Nome do item:', item.name);
+    if (newName === null) return;
+    
+    const newQty = prompt('Quantidade:', item.qty);
+    if (newQty === null) return;
+    
+    const newPrice = prompt('Preço (R$):', item.price);
+    if (newPrice === null) return;
+
+    if (newName.trim()) {
+      item.name = newName.trim();
+    }
+    if (newQty && !isNaN(parseInt(newQty))) {
+      item.qty = parseInt(newQty);
+    }
+    if (newPrice && !isNaN(parseFloat(newPrice))) {
+      item.price = parseFloat(newPrice);
+    }
+
+    this.renderShoppingList();
+  },
+
   togglePurchased(type, itemId) {
     const item = this.state.shoppingLists[type].find(i => i.id === itemId);
     if (item) {
@@ -788,7 +871,8 @@ const app = {
               <span style="color: var(--color-text-secondary);">Total: R$ ${itemTotal.toFixed(2)}</span>
             </div>
             <div class="shopping-item-actions">
-              <button class="btn btn--sm btn--secondary" onclick="app.deleteShoppingItem('${type}', ${item.id})">🗑️</button>
+              <button class="btn btn--sm btn--secondary" onclick="app.editShoppingItem('${type}', ${item.id})" title="Editar">✏️</button>
+              <button class="btn btn--sm btn--secondary" onclick="app.deleteShoppingItem('${type}', ${item.id})" title="Excluir">🗑️</button>
             </div>
           </div>
         `;
@@ -907,7 +991,7 @@ const app = {
       
       html += `
         <div class="exam-card">
-          <h4>🏥 ${exam.type}</h4>
+          <h4><span class="exam-icon-large">🏥</span> ${exam.type}</h4>
           <div class="exam-info">
             <div>📅 Data: ${formattedDate}</div>
             ${exam.time ? `<div>🕐 Horário: ${exam.time}</div>` : ''}
@@ -1265,6 +1349,361 @@ const app = {
 
   showExamNotification(exam) {
     alert(`🏥 Lembrete de Exame: ${exam.type}\n\nData: ${this.formatDateStr(exam.date)}${exam.time ? '\nHorário: ' + exam.time : ''}${exam.location ? '\nLocal: ' + exam.location : ''}`);
+  },
+
+  // Pomodoro Timer Functions
+  initPomodoro() {
+    this.updatePomodoroDisplay();
+    this.initAudio();
+  },
+
+  // HTML5 Audio Functions
+  initAudio() {
+    // Create HTML5 Audio element for pomodoro.mp3
+    this.audioElement = new Audio('pomodoro.mp3');
+    this.audioElement.loop = true; // Enable looping
+    this.audioElement.volume = this.state.pomodoro.audio.volume;
+    
+    // Listen for audio events
+    this.audioElement.addEventListener('canplaythrough', () => {
+      console.log('Audio loaded successfully');
+      this.audioReady = true;
+      this.updateAudioStatusText('✅ Áudio carregado! Clique em "Iniciar" para começar');
+    });
+    
+    this.audioElement.addEventListener('error', (e) => {
+      console.error('Audio loading error:', e);
+      this.updateAudioStatusText('❌ Erro ao carregar áudio. Verifique o arquivo pomodoro.mp3');
+    });
+    
+    this.audioElement.addEventListener('play', () => {
+      console.log('Audio started playing');
+      this.state.pomodoro.audio.isPlaying = true;
+    });
+    
+    this.audioElement.addEventListener('pause', () => {
+      console.log('Audio paused');
+      this.state.pomodoro.audio.isPlaying = false;
+    });
+    
+    // Preload the audio
+    this.audioElement.load();
+    
+    // Update UI
+    this.updateAudioUI();
+  },
+
+
+
+  startAudio() {
+    if (!this.audioElement || !this.audioReady) {
+      console.warn('Audio not ready yet');
+      this.updateAudioStatusText('⏳ Aguardando áudio carregar...');
+      return;
+    }
+    
+    try {
+      const playPromise = this.audioElement.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            this.state.pomodoro.audio.isPlaying = true;
+            this.updateAudioStatusText('🎵 Áudio Pomodoro reproduzindo para concentração...');
+            console.log('Audio started successfully');
+          })
+          .catch((error) => {
+            console.error('Error playing audio:', error);
+            this.updateAudioStatusText('❌ Erro ao reproduzir áudio. Clique novamente.');
+          });
+      }
+    } catch (e) {
+      console.error('Error starting audio:', e);
+    }
+  },
+
+  stopAudio() {
+    if (!this.audioElement) return;
+    
+    try {
+      this.audioElement.pause();
+      this.audioElement.currentTime = 0; // Reset to beginning
+      this.state.pomodoro.audio.isPlaying = false;
+      console.log('Audio stopped');
+    } catch (e) {
+      console.error('Error stopping audio:', e);
+    }
+  },
+
+  pauseAudio() {
+    if (!this.audioElement) return;
+    
+    try {
+      this.audioElement.pause();
+      this.state.pomodoro.audio.isPlaying = false;
+      console.log('Audio paused');
+    } catch (e) {
+      console.error('Error pausing audio:', e);
+    }
+  },
+
+  changeVolume(value) {
+    const volumeDisplay = document.getElementById('volumeValue');
+    
+    if (!volumeDisplay) return;
+    
+    const volume = parseInt(value) / 100;
+    this.state.pomodoro.audio.volume = volume;
+    
+    // Update HTML5 Audio volume
+    if (this.audioElement) {
+      this.audioElement.volume = volume;
+    }
+    
+    volumeDisplay.textContent = value + '%';
+  },
+
+  toggleAudio() {
+    this.state.pomodoro.audio.enabled = !this.state.pomodoro.audio.enabled;
+    
+    if (this.state.pomodoro.audio.enabled) {
+      // If timer is running, start audio
+      if (this.state.pomodoro.isRunning) {
+        this.startAudio();
+      }
+    } else {
+      // Stop audio
+      this.pauseAudio();
+    }
+    
+    this.updateAudioUI();
+  },
+
+  updateAudioUI() {
+    const toggleBtn = document.getElementById('audioToggleBtn');
+    const toggleIcon = document.getElementById('audioToggleIcon');
+    const toggleText = document.getElementById('audioToggleText');
+    
+    if (!toggleBtn || !toggleIcon || !toggleText) return;
+    
+    if (this.state.pomodoro.audio.enabled) {
+      toggleIcon.textContent = '🔊';
+      toggleText.textContent = 'Áudio Ativado';
+      toggleBtn.classList.remove('btn--secondary');
+      toggleBtn.classList.add('btn--primary');
+      
+      if (this.state.pomodoro.isRunning) {
+        this.updateAudioStatusText('🎵 Áudio Pomodoro reproduzindo para concentração...');
+      } else {
+        this.updateAudioStatusText('✅ Pronto! Clique em "Iniciar" para começar');
+      }
+    } else {
+      toggleIcon.textContent = '🔇';
+      toggleText.textContent = 'Áudio Desativado';
+      toggleBtn.classList.remove('btn--primary');
+      toggleBtn.classList.add('btn--secondary');
+      this.updateAudioStatusText('⚠️ Áudio desativado');
+    }
+  },
+
+  updateAudioStatusText(text) {
+    const statusText = document.getElementById('audioStatusText');
+    if (statusText) {
+      statusText.textContent = text;
+    }
+  },
+
+  playPomodoroAudio() {
+    if (!this.state.pomodoro.audio.enabled) return;
+    
+    console.log('Starting audio...');
+    this.startAudio();
+  },
+
+  pausePomodoroAudio() {
+    console.log('Pausing audio...');
+    this.pauseAudio();
+    
+    if (this.state.pomodoro.audio.enabled) {
+      this.updateAudioStatusText('⏸️ Áudio pausado');
+    }
+  },
+
+  resetPomodoroAudio() {
+    console.log('Resetting audio...');
+    this.stopAudio();
+    
+    if (this.state.pomodoro.audio.enabled) {
+      this.updateAudioStatusText('✅ Áudio resetado - Pronto para iniciar');
+    }
+  },
+
+  applyPomodoroSettings() {
+    const focusTime = parseInt(document.getElementById('focusTime').value);
+    const breakTime = parseInt(document.getElementById('breakTime').value);
+    
+    if (focusTime < 1 || focusTime > 120) {
+      alert('O tempo de concentração deve estar entre 1 e 120 minutos.');
+      return;
+    }
+    
+    if (breakTime < 1 || breakTime > 60) {
+      alert('O tempo de descanso deve estar entre 1 e 60 minutos.');
+      return;
+    }
+    
+    // Only apply if timer is not running
+    if (this.state.pomodoro.isRunning) {
+      alert('Pause o temporizador antes de alterar as configurações.');
+      return;
+    }
+    
+    this.state.pomodoro.focusTime = focusTime;
+    this.state.pomodoro.breakTime = breakTime;
+    
+    // Reset to new focus time
+    this.state.pomodoro.mode = 'focus';
+    this.state.pomodoro.currentTime = focusTime * 60;
+    this.updatePomodoroDisplay();
+    
+    alert('✓ Configurações aplicadas com sucesso!');
+  },
+
+  startPomodoro() {
+    if (!this.state.pomodoro.isRunning) {
+      this.state.pomodoro.isRunning = true;
+      this.state.pomodoro.isPaused = false;
+      
+      // Add visual effect
+      document.getElementById('pomodoroContainer').classList.add('timer-running');
+      
+      // Update button visibility
+      document.getElementById('pomodoroStartBtn').style.display = 'none';
+      document.getElementById('pomodoroPauseBtn').style.display = 'inline-flex';
+      
+      // Start audio
+      this.playPomodoroAudio();
+      
+      // Start countdown
+      this.state.pomodoro.intervalId = setInterval(() => {
+        this.state.pomodoro.currentTime--;
+        
+        if (this.state.pomodoro.currentTime <= 0) {
+          this.pomodoroComplete();
+        } else {
+          this.updatePomodoroDisplay();
+        }
+      }, 1000);
+    }
+  },
+
+  pausePomodoro() {
+    if (this.state.pomodoro.isRunning) {
+      this.state.pomodoro.isRunning = false;
+      this.state.pomodoro.isPaused = true;
+      
+      // Remove visual effect
+      document.getElementById('pomodoroContainer').classList.remove('timer-running');
+      
+      // Update button visibility
+      document.getElementById('pomodoroStartBtn').style.display = 'inline-flex';
+      document.getElementById('pomodoroPauseBtn').style.display = 'none';
+      
+      // Pause audio
+      this.pausePomodoroAudio();
+      
+      // Stop countdown
+      if (this.state.pomodoro.intervalId) {
+        clearInterval(this.state.pomodoro.intervalId);
+        this.state.pomodoro.intervalId = null;
+      }
+    }
+  },
+
+  resetPomodoro() {
+    // Stop timer if running
+    if (this.state.pomodoro.isRunning) {
+      this.pausePomodoro();
+    }
+    
+    // Stop and reset audio
+    this.resetPomodoroAudio();
+    
+    // Reset to focus mode
+    this.state.pomodoro.mode = 'focus';
+    this.state.pomodoro.currentTime = this.state.pomodoro.focusTime * 60;
+    this.state.pomodoro.isPaused = false;
+    
+    // Update display
+    this.updatePomodoroDisplay();
+    this.updateAudioUI();
+    
+    // Reset button visibility
+    document.getElementById('pomodoroStartBtn').style.display = 'inline-flex';
+    document.getElementById('pomodoroPauseBtn').style.display = 'none';
+  },
+
+  pomodoroComplete() {
+    // Stop timer
+    if (this.state.pomodoro.intervalId) {
+      clearInterval(this.state.pomodoro.intervalId);
+      this.state.pomodoro.intervalId = null;
+    }
+    
+    this.state.pomodoro.isRunning = false;
+    
+    // Remove visual effect
+    document.getElementById('pomodoroContainer').classList.remove('timer-running');
+    
+    // Pause audio
+    this.pausePomodoroAudio();
+    
+    // Show notification based on current mode
+    if (this.state.pomodoro.mode === 'focus') {
+      alert('🎉 Parabéns! Tempo de concentração completo!\n\n☕ Hora de fazer uma pausa e descansar.');
+      
+      // Switch to break mode
+      this.state.pomodoro.mode = 'break';
+      this.state.pomodoro.currentTime = this.state.pomodoro.breakTime * 60;
+    } else {
+      alert('✅ Tempo de descanso completo!\n\n🎯 Pronto para voltar a focar?');
+      
+      // Switch back to focus mode
+      this.state.pomodoro.mode = 'focus';
+      this.state.pomodoro.currentTime = this.state.pomodoro.focusTime * 60;
+    }
+    
+    // Update display
+    this.updatePomodoroDisplay();
+    this.updateAudioUI();
+    
+    // Reset button visibility
+    document.getElementById('pomodoroStartBtn').style.display = 'inline-flex';
+    document.getElementById('pomodoroPauseBtn').style.display = 'none';
+  },
+
+  updatePomodoroDisplay() {
+    const minutes = Math.floor(this.state.pomodoro.currentTime / 60);
+    const seconds = this.state.pomodoro.currentTime % 60;
+    const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    
+    const timerElement = document.getElementById('pomodoroTimer');
+    const modeElement = document.getElementById('pomodoroModeText');
+    const modeIndicator = document.querySelector('.pomodoro-mode-indicator');
+    
+    if (timerElement) {
+      timerElement.textContent = timeString;
+    }
+    
+    if (modeElement && modeIndicator) {
+      if (this.state.pomodoro.mode === 'focus') {
+        modeElement.textContent = '🎯 Concentração';
+        modeIndicator.classList.remove('break-mode');
+      } else {
+        modeElement.textContent = '☕ Descanso';
+        modeIndicator.classList.add('break-mode');
+      }
+    }
   }
 };
 

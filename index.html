@@ -47,6 +47,7 @@
             <button class="tab-btn" data-tab="compras">🛒 Compras</button>
             <button class="tab-btn" data-tab="exames">🏥 Exames</button>
             <button class="tab-btn" data-tab="projetos">📊 Projetos</button>
+            <button class="tab-btn" data-tab="foco">🎯 Foco</button>
             <button class="tab-btn" data-tab="configuracoes">⚙️ Config</button>
         </nav>
 
@@ -211,6 +212,93 @@
                     <button class="btn btn--primary" onclick="app.openProjectModal()">+ Novo Projeto</button>
                 </div>
                 <div id="projectsList" class="projects-list"></div>
+            </section>
+
+            <!-- FOCO TAB -->
+            <section id="foco-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>🎯 Foco - Pomodoro</h2>
+                </div>
+
+                <!-- Audio Controls -->
+                <div class="card" style="margin-bottom: var(--space-24); background-color: var(--color-bg-1); border: 2px solid var(--color-primary);">
+                    <div class="card__body">
+                        <h3 style="margin-bottom: var(--space-8); font-size: var(--font-size-lg);">🎵 Áudio - Pomodoro 25/5 com Ruído Azul para TDAH</h3>
+                        <p style="margin-bottom: var(--space-16); font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                            🧠 Este <strong>áudio especializado</strong> de ruído azul é perfeito para concentração e foco. O áudio sincroniza automaticamente com o temporizador Pomodoro.
+                        </p>
+                        
+                        <div class="audio-controls-grid">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Volume: <span id="volumeValue">70%</span></label>
+                                <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="70" oninput="app.changeVolume(this.value)">
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: var(--space-8); margin-top: var(--space-16); flex-wrap: wrap; align-items: center;">
+                            <button id="audioToggleBtn" class="btn btn--primary btn--sm" onclick="app.toggleAudio()">
+                                <span id="audioToggleIcon">🔊</span> <span id="audioToggleText">Áudio Ativado</span>
+                            </button>
+                            <div style="flex: 1; min-width: 200px; display: flex; align-items: center; gap: var(--space-8); font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                                <span id="audioStatusText">✅ Pronto! Clique em "Iniciar" para começar</span>
+                            </div>
+                        </div>
+                        <div style="margin-top: var(--space-12); padding: var(--space-12); background-color: var(--color-bg-2); border-radius: var(--radius-base); font-size: var(--font-size-xs); color: var(--color-text-secondary);">
+                            🎵 Áudio: Ruído Azul Pomodoro para TDAH - pomodoro.mp3
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pomodoro Settings -->
+                <div class="card" style="margin-bottom: var(--space-24);">
+                    <div class="card__body">
+                        <h3 style="margin-bottom: var(--space-16); font-size: var(--font-size-lg);">⚙️ Configurações do Temporizador</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-16); margin-bottom: var(--space-16);">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Tempo de Concentração (minutos):</label>
+                                <input type="number" id="focusTime" class="form-control" value="25" min="1" max="120">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Tempo de Descanso (minutos):</label>
+                                <input type="number" id="breakTime" class="form-control" value="5" min="1" max="60">
+                            </div>
+                        </div>
+                        <button class="btn btn--secondary btn--sm" onclick="app.applyPomodoroSettings()">✓ Aplicar Configurações</button>
+                    </div>
+                </div>
+
+                <!-- Pomodoro Timer Container -->
+                <div id="pomodoroContainer" class="pomodoro-container">
+                    <div class="pomodoro-overlay">
+                        <div class="pomodoro-content">
+                            <div class="pomodoro-mode-indicator">
+                                <span id="pomodoroModeText">Concentração</span>
+                            </div>
+                            
+                            <div class="pomodoro-timer-display">
+                                <div id="pomodoroTimer" class="timer-text">25:00</div>
+                            </div>
+                            
+                            <div class="pomodoro-controls">
+                                <button id="pomodoroStartBtn" class="btn btn--primary btn-pomodoro" onclick="app.startPomodoro()">
+                                    ▶️ Iniciar
+                                </button>
+                                <button id="pomodoroPauseBtn" class="btn btn--secondary btn-pomodoro" onclick="app.pausePomodoro()" style="display: none;">
+                                    ⏸️ Pausar
+                                </button>
+                                <button id="pomodoroResetBtn" class="btn btn--secondary btn-pomodoro" onclick="app.resetPomodoro()">
+                                    ↺ Resetar
+                                </button>
+                            </div>
+                            
+                            <div class="pomodoro-info">
+                                <p style="margin: 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); text-align: center;">
+                                    Use o método Pomodoro para manter o foco e produtividade!
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- CONFIGURAÇÕES TAB -->
