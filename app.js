@@ -1,7 +1,250 @@
-// Personal Agenda Application
+// ===== Supabase Adapter (apenas camada de dados; não muda UI) =====
+const db = {
+  client: null,
+  init() {
+    const { createClient } = window.supabase || {};
+    if (!createClient) {
+      console.error("Supabase SDK não carregado.");
+      return;
+    }
+    this.client = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  },
+
+// ---------- TASKS ----------
+async loadTasks() {
+  const { data, error } = await this.client
+    .from('tasks')
+    .select('*')
+    .order('date', { ascending: true })
+    .order('time', { ascending: true });
+  if (error) throw error;
+ return (data || []).map(row => {
+  // normaliza status para os três usados pela UI
+  const statusMap = {
+    'afazer': 'pendente',
+    'todo': 'pendente',
+    'doing': 'andamento',
+    'in_progress': 'andamento',
+    'em_andamento': 'andamento',
+    'done': 'concluida',
+    'concluída': 'concluida',
+    'concluido': 'concluida'
+  };
+  const normStatus = statusMap[(row.status || '').toLowerCase()] || row.status || 'pendente';
+
+  return {
+    id: row.id,
+    title: row.title || '',
+    name: row.title || '',
+    description: row.description || '',
+    date: row.date || '',
+    time: row.time || '',
+    priority: row.priority || 'normal',
+    status: normStatus,
+    alarm: !!row.alarm,            // se existir no schema
+    createdAt: row.created_at || new Date().toISOString()
+  };
+});
+},
+async upsertTask(task) {
+  // mapeia status da UI (pendente/andamento/concluida) para o schema do banco (afazer/andamento/concluida)
+  const statusMapOut = {
+    pendente: 'afazer',
+    andamento: 'andamento',
+    concluida: 'concluida'
+  };
+  const normalizedStatus =
+    statusMapOut[(task.status || '').toLowerCase()] || 'afazer';
+
+  const payload = {
+    id: String(task.id),
+    title: (task.title ?? task.name ?? '').toString(),
+    description: task.description ?? null,
+    date: task.date ?? null,
+    time: task.time ?? null,
+    priority: task.priority ?? 'normal',
+    status: normalizedStatus,
+    // ⚠️ IMPORTANTE: não existe coluna "alarm" na tabela tasks, então NÃO enviamos
+    // alarm: task.alarm ?? null,
+    updated_at: new Date().toISOString()
+  };
+
+  if (!task.createdAt) {
+    payload.created_at = new Date().toISOString();
+  }
+
+  const { error } = await this.client.from('tasks').upsert(payload);
+  if (error) {
+    console.error('Erro ao salvar tarefa no Supabase:', error);
+    throw error;
+  }
+},
+async deleteTask(id) {
+  const { error } = await this.client.from('tasks').delete().eq('id', String(id));
+  if (error) throw error;
+},
+
+
+  // ---------- EXAMS ----------
+  async loadExams() {
+    const { data, error } = await this.client
+      .from('exams').select('*')
+      .order('date', { ascending: true })
+      .order('time', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(row => ({
+      id: row.id,
+      type: row.title || '',
+      date: row.date || '',
+      time: row.time || '',
+      location: row.location || '',
+      notes: row.description || '',
+      fileName: null
+    }));
+  },
+  async upsertExam(exam) {
+    const payload = {
+      id: String(exam.id),
+      title: exam.type ?? '',
+      description: exam.notes ?? null,
+      date: exam.date ?? null,
+      time: exam.time ?? null,
+      location: exam.location ?? null,
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await this.client.from('exams').upsert(payload);
+    if (error) throw error;
+  },
+  async deleteExam(id) {
+    const { error } = await this.client.from('exams').delete().eq('id', String(id));
+    if (error) throw error;
+  },
+
+  // ---------- SHOPPING ----------
+  async loadShopping(listType) {
+    const { data, error } = await this.client
+      .from('shopping_items').select('*')
+      .eq('list_type', listType)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(row => ({
+      id: row.id,
+      name: row.name,
+      qty: Number(row.quantity ?? 1),
+      price: Number(row.unit_price ?? 0),
+      purchased: !!row.purchased
+    }));
+  },
+  async upsertShoppingItem(listType, item) {
+    const payload = {
+      id: String(item.id),
+      list_type: listType,
+      name: item.name,
+      quantity: item.qty ?? 1,
+      unit_price: item.price ?? null,
+      purchased: !!item.purchased,
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await this.client.from('shopping_items').upsert(payload);
+    if (error) throw error;
+  },
+  async deleteShoppingItem(id) {
+    const { error } = await this.client.from('shopping_items').delete().eq('id', String(id));
+    if (error) throw error;
+  },
+
+  // ---------- PROJECTS & PROJECT_TASKS ----------
+    async loadProjectsWithTasks() {
+    const { data: projects, error: e1 } = await this.client
+      .from('projects').select('*').order('created_at', { ascending: true });
+    if (e1) throw e1;
+
+    const { data: tasks, error: e2 } = await this.client
+      .from('project_tasks').select('*').order('created_at', { ascending: true });
+    if (e2) throw e2;
+
+    const taskByProject = {};
+    (tasks || []).forEach(t => {
+      (taskByProject[t.project_id] ||= []).push({
+        id: t.id,
+        name: t.title || '',
+        description: t.description || '',
+        state: t.state || 'fazer',
+        timeSpent: Number(t.time_spent ?? 0),
+        isRunning: !!t.is_running,
+        startTime: t.start_time ? Number(t.start_time) : null,
+        createdAt: t.created_at || null  // Adicionado: Para identificar novos vs existentes
+      });
+    });
+
+    return (projects || []).map(p => ({
+      id: p.id,
+      name: p.name || '',
+      description: p.description || '',
+      createdAt: p.created_at || null,  // Adicionado: Para identificar novos vs existentes
+      tasks: taskByProject[p.id] || []
+    }));
+  },
+
+    async upsertProject(project) {
+      const payload = {
+        id: String(project.id),
+        name: project.name,
+        description: project.description ?? null,
+        updated_at: new Date().toISOString()
+      };
+      // Removido: Não enviamos created_at - banco cuida
+      const { error } = await this.client.from('projects').upsert(payload);
+      if (error) throw error;
+    },
+
+    async upsertProjectTask(projectId, task) {
+    const payload = {
+      id: String(task.id),
+      project_id: String(projectId),
+      title: task.name,
+      description: task.description ?? null,
+      state: task.state ?? 'fazer',
+      time_spent: Number(Math.floor(task.timeSpent ?? 0)),
+      is_running: !!task.isRunning,
+      start_time: task.startTime ? Number(Math.floor(task.startTime)) : null,
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await this.client.from('project_tasks').upsert(payload);
+    if (error) throw error;
+  },
+  async updateProjectTaskTimer(projectId, task) {
+    return this.upsertProjectTask(projectId, task);
+  },
+  async deleteProjectTask(id) {
+    const { error } = await this.client.from('project_tasks').delete().eq('id', String(id));
+    if (error) throw error;
+  },
+
+  // ---------- LOAD ALL ----------
+  async loadAllInto(state) {
+    const [tasks, exams, sup, far, projects] = await Promise.all([
+      this.loadTasks(),
+      this.loadExams(),
+      this.loadShopping('supermercado'),
+      this.loadShopping('farmacia'),
+      this.loadProjectsWithTasks()
+    ]);
+    state.tasks = tasks;
+    state.exams = exams;
+    state.shoppingLists.supermercado = sup;
+    state.shoppingLists.farmacia = far;
+    state.projects = projects;
+  }
+};
+
 const app = {
   // State management (in-memory)
   state: {
+    notified: {
+      tasks: {},   // ex.: notified.tasks[taskId] = true
+      exams: {}    // ex.: notified.exams[examId] = true
+    },
     tasks: [],
     shoppingLists: {
       supermercado: [],
@@ -43,7 +286,10 @@ const app = {
   },
 
   // Initialize app
-  init() {
+    async init() {
+      db.init();
+      try { await db.loadAllInto(this.state); } catch (e) { console.warn("Load Supabase falhou:", e); }
+
     this.setDefaultDates();
     this.setupEventListeners();
     this.setupHamburgerMenu();
@@ -394,8 +640,16 @@ const app = {
     const modal = document.getElementById('taskModal');
     const title = document.getElementById('taskModalTitle');
     
-    if (taskId) {
-      this.state.editingTask = this.state.tasks.find(t => t.id === taskId);
+    if (taskId != null) {
+      this.state.editingTask = this.state.tasks.find(
+        t => String(t.id) === String(taskId)
+      );
+
+      if (!this.state.editingTask) {
+        console.warn('Tarefa não encontrada para edição. id:', taskId);
+        return;
+      }
+
       title.textContent = 'Editar Tarefa';
       this.populateTaskForm(this.state.editingTask);
     } else {
@@ -410,6 +664,7 @@ const app = {
     
     modal.classList.add('active');
   },
+
 
   closeTaskModal() {
     document.getElementById('taskModal').classList.remove('active');
@@ -454,7 +709,7 @@ const app = {
     }
 
     const task = {
-      id: this.state.editingTask ? this.state.editingTask.id : Date.now(),
+      id: this.state.editingTask ? this.state.editingTask.id : String(Date.now()),
       title,
       description,
       date,
@@ -476,15 +731,18 @@ const app = {
     this.renderTasks();
     this.renderTasksDashboard();
     this.renderCalendar();
+    db.upsertTask(task).catch(console.error); // SUPABASE
   },
 
   deleteTask(taskId) {
     if (confirm('Tem certeza que deseja excluir esta tarefa?')) {
-      this.state.tasks = this.state.tasks.filter(t => t.id !== taskId);
+      this.state.tasks = this.state.tasks.filter(t => String(t.id) !== String(taskId));
       this.renderTasks();
       this.renderTasksDashboard();
       this.renderCalendar();
     }
+    db.deleteTask(taskId).catch(console.error); // SUPABASE
+
   },
 
   // Quick task functions for Tasks tab
@@ -501,7 +759,7 @@ const app = {
     }
 
     const task = {
-      id: Date.now(),
+      id: String(Date.now()),
       title,
       description,
       date,
@@ -526,14 +784,16 @@ const app = {
     this.renderTasksDashboard();
     this.renderTasks();
     this.renderCalendar();
+    db.upsertTask(task).catch(console.error); // SUPABASE
   },
 
   changeTaskStatus(taskId, newStatus) {
-    const task = this.state.tasks.find(t => t.id === taskId);
+    const task = this.state.tasks.find(t => String(t.id) === String(taskId));
     if (task) {
       task.status = newStatus;
       this.renderTasksDashboard();
       this.renderTasks();
+      db.upsertTask(task).catch(console.error);
     }
   },
 
@@ -617,14 +877,15 @@ const app = {
           </div>
           <div class="task-card-actions">
             <div style="display: flex; gap: var(--space-4);">
-              ${status === 'pendente' ? `<button class="btn btn--sm btn--primary" onclick="app.changeTaskStatus(${task.id}, 'andamento')" title="Iniciar">▶️</button>` : ''}
-              ${status === 'andamento' ? `<button class="btn btn--sm btn--primary" onclick="app.changeTaskStatus(${task.id}, 'concluida')" title="Concluir">✓</button>` : ''}
-              ${status === 'andamento' ? `<button class="btn btn--sm btn--secondary" onclick="app.changeTaskStatus(${task.id}, 'pendente')" title="Voltar">⏸</button>` : ''}
-              ${status === 'concluida' ? `<button class="btn btn--sm btn--secondary" onclick="app.changeTaskStatus(${task.id}, 'pendente')" title="Reabrir">↺</button>` : ''}
+               ${status === 'pendente' ? `<button class="btn btn--sm btn--primary" onclick="app.changeTaskStatus('${task.id}', 'andamento')" title="Iniciar">▶️</button>` : ''}
+               ${status === 'andamento' ? `<button class="btn btn--sm btn--primary" onclick="app.changeTaskStatus('${task.id}', 'concluida')" title="Concluir">✓</button>` : ''}
+               ${status === 'andamento' ? `<button class="btn btn--sm btn--secondary" onclick="app.changeTaskStatus('${task.id}', 'pendente')" title="Voltar">⏸</button>` : ''}
+               ${status === 'concluida' ? `<button class="btn btn--sm btn--secondary" onclick="app.changeTaskStatus('${task.id}', 'pendente')" title="Reabrir">↺</button>` : ''}
             </div>
             <div style="display: flex; gap: var(--space-4);">
-              <button class="btn btn--sm btn--secondary" onclick="app.openTaskModal(${task.id})" title="Editar">✏️</button>
-              <button class="btn btn--sm btn--secondary" onclick="app.deleteTask(${task.id})" title="Excluir">🗑️</button>
+               <button class="btn btn--sm btn--secondary" onclick="app.openTaskModal('${task.id}')">✏️</button>
+               <button class="btn btn--sm btn--secondary" onclick="app.deleteTask('${task.id}')">🗑️</button>
+
             </div>
           </div>
         </div>
@@ -736,8 +997,8 @@ const app = {
             </div>
           </div>
           <div class="task-actions">
-            <button class="btn btn--sm btn--secondary" onclick="app.openTaskModal(${task.id})">✏️</button>
-            <button class="btn btn--sm btn--secondary" onclick="app.deleteTask(${task.id})">🗑️</button>
+            <button class="btn btn--sm btn--secondary" onclick="app.openTaskModal('${task.id}')">✏️</button>
+            <button class="btn btn--sm btn--secondary" onclick="app.deleteTask('${task.id}')">🗑️</button>
           </div>
         </div>
       `;
@@ -784,7 +1045,7 @@ const app = {
     }
 
     const item = {
-      id: Date.now(),
+      id: String(Date.now()),  // Correção: Novo id como string
       name,
       qty,
       price,
@@ -798,10 +1059,14 @@ const app = {
     priceInput.value = '';
     
     this.renderShoppingList();
+    db.upsertShoppingItem(type, item).catch(error => {
+      console.error('Erro ao salvar item de compra:', error);
+      alert('Erro ao salvar no banco de dados. Verifique o console para detalhes.');  // Adicionado: Alerta para usuário
+    }); // SUPABASE
   },
 
   editShoppingItem(type, itemId) {
-    const item = this.state.shoppingLists[type].find(i => i.id === itemId);
+    const item = this.state.shoppingLists[type].find(i => i.id === itemId);  // Comparação safe (id como string ou number, mas após correção, string)
     if (!item) return;
 
     const newName = prompt('Nome do item:', item.name);
@@ -824,6 +1089,10 @@ const app = {
     }
 
     this.renderShoppingList();
+    db.upsertShoppingItem(type, item).catch(error => {
+      console.error('Erro ao editar item de compra:', error);
+      alert('Erro ao editar no banco de dados. Verifique o console para detalhes.');  // Adicionado: Alerta para usuário
+    }); // SUPABASE
   },
 
   togglePurchased(type, itemId) {
@@ -832,14 +1101,19 @@ const app = {
       item.purchased = !item.purchased;
       this.renderShoppingList();
     }
+    db.upsertShoppingItem(type, item).catch(error => {
+      console.error('Erro ao atualizar status de compra:', error);
+      alert('Erro ao atualizar no banco de dados. Verifique o console para detalhes.');  // Adicionado: Alerta para usuário
+    }); // SUPABASE
   },
 
   deleteShoppingItem(type, itemId) {
     this.state.shoppingLists[type] = this.state.shoppingLists[type].filter(i => i.id !== itemId);
     this.renderShoppingList();
+    db.deleteShoppingItem(itemId).catch(console.error); // SUPABASE
   },
 
-  renderShoppingList() {
+    renderShoppingList() {
     ['supermercado', 'farmacia'].forEach(type => {
       const container = document.getElementById(`${type}-items`);
       const totalElement = document.getElementById(`${type}-total`);
@@ -866,13 +1140,13 @@ const app = {
           <div class="shopping-item ${item.purchased ? 'purchased' : ''}">
             <div class="shopping-item-info">
               <input type="checkbox" ${item.purchased ? 'checked' : ''} 
-                     onchange="app.togglePurchased('${type}', ${item.id})">
+                     onchange="app.togglePurchased('${type}', '${item.id}')">  <!-- Correção: Aspas ao redor do id -->
               <span><strong>${item.name}</strong> - Qtd: ${item.qty} - R$ ${item.price.toFixed(2)}</span>
               <span style="color: var(--color-text-secondary);">Total: R$ ${itemTotal.toFixed(2)}</span>
             </div>
             <div class="shopping-item-actions">
-              <button class="btn btn--sm btn--secondary" onclick="app.editShoppingItem('${type}', ${item.id})" title="Editar">✏️</button>
-              <button class="btn btn--sm btn--secondary" onclick="app.deleteShoppingItem('${type}', ${item.id})" title="Excluir">🗑️</button>
+              <button class="btn btn--sm btn--secondary" onclick="app.editShoppingItem('${type}', '${item.id}')" title="Editar">✏️</button>  <!-- Correção: Aspas ao redor do id -->
+              <button class="btn btn--sm btn--secondary" onclick="app.deleteShoppingItem('${type}', '${item.id}')" title="Excluir">🗑️</button>  <!-- Correção: Aspas ao redor do id -->
             </div>
           </div>
         `;
@@ -944,7 +1218,7 @@ const app = {
     }
 
     const exam = {
-      id: this.state.editingExam ? this.state.editingExam.id : Date.now(),
+      id: this.state.editingExam ? this.state.editingExam.id : String(Date.now()),  // Correção: Novo id como string
       type,
       date,
       time,
@@ -954,7 +1228,7 @@ const app = {
     };
 
     if (this.state.editingExam) {
-      const index = this.state.exams.findIndex(e => e.id === this.state.editingExam.id);
+      const index = this.state.exams.findIndex(e => e.id === this.state.editingExam.id);  // Comparação safe (ambos string)
       this.state.exams[index] = exam;
     } else {
       this.state.exams.push(exam);
@@ -963,6 +1237,10 @@ const app = {
     this.closeExamModal();
     this.renderExams();
     this.renderTasksDashboard();
+    db.upsertExam(exam).catch(error => {
+      console.error('Erro ao salvar exame:', error);
+      alert('Erro ao salvar no banco de dados. Verifique o console para detalhes.');  // Adicionado: Alerta para usuário
+    }); // SUPABASE
   },
 
   deleteExam(examId) {
@@ -971,9 +1249,10 @@ const app = {
       this.renderExams();
       this.renderTasksDashboard();
     }
+    db.deleteExam(examId).catch(console.error); // SUPABASE
   },
 
-  renderExams() {
+   renderExams() {
     const container = document.getElementById('examesList');
     if (!container) return;
 
@@ -1000,8 +1279,8 @@ const app = {
           </div>
           ${exam.notes ? `<div class="exam-notes"><strong>Observações:</strong><br>${exam.notes}</div>` : ''}
           <div class="exam-actions">
-            <button class="btn btn--sm btn--secondary" onclick="app.openExamModal(${exam.id})">✏️ Editar</button>
-            <button class="btn btn--sm btn--secondary" onclick="app.deleteExam(${exam.id})">🗑️ Excluir</button>
+            <button class="btn btn--sm btn--secondary" onclick="app.openExamModal('${exam.id}')">✏️ Editar</button>  <!-- Correção: Aspas ao redor do id -->
+            <button class="btn btn--sm btn--secondary" onclick="app.deleteExam('${exam.id}')">🗑️ Excluir</button>  <!-- Correção: Aspas ao redor do id -->
           </div>
         </div>
       `;
@@ -1035,7 +1314,7 @@ const app = {
     this.state.editingProject = null;
   },
 
-  saveProject() {
+saveProject() {
     const name = document.getElementById('projectName').value;
     const description = document.getElementById('projectDescription').value;
 
@@ -1045,21 +1324,27 @@ const app = {
     }
 
     const project = {
-      id: this.state.editingProject ? this.state.editingProject.id : Date.now(),
+      id: this.state.editingProject ? this.state.editingProject.id : crypto.randomUUID(),
       name,
       description,
       tasks: this.state.editingProject ? this.state.editingProject.tasks : []
     };
 
-    if (this.state.editingProject) {
-      const index = this.state.projects.findIndex(p => p.id === this.state.editingProject.id);
-      this.state.projects[index] = project;
-    } else {
-      this.state.projects.push(project);
-    }
-
-    this.closeProjectModal();
-    this.renderProjects();
+    db.upsertProject(project)
+      .then(() => {
+        if (this.state.editingProject) {
+          const index = this.state.projects.findIndex(p => p.id === this.state.editingProject.id);
+          this.state.projects[index] = project;
+        } else {
+          this.state.projects.push(project);
+        }
+        this.closeProjectModal();
+        this.renderProjects();
+      })
+      .catch(error => {
+        console.error('Erro ao salvar projeto:', error);
+        alert('Erro ao salvar projeto: ' + error.message + '. Verifique o console para detalhes.');
+      });
   },
 
   deleteProject(projectId) {
@@ -1067,6 +1352,7 @@ const app = {
       this.state.projects = this.state.projects.filter(p => p.id !== projectId);
       this.renderProjects();
     }
+    db.deleteProject(projectId).catch(console.error); // SUPABASE
   },
 
   openProjectTaskModal(projectId, taskId = null) {
@@ -1112,7 +1398,7 @@ const app = {
     if (!project) return;
 
     const task = {
-      id: this.state.editingProjectTask ? this.state.editingProjectTask.id : Date.now(),
+      id: this.state.editingProjectTask ? this.state.editingProjectTask.id : crypto.randomUUID(),
       name,
       description,
       state,
@@ -1128,8 +1414,16 @@ const app = {
       project.tasks.push(task);
     }
 
-    this.closeProjectTaskModal();
-    this.renderProjects();
+    db.upsertProject(project)
+      .then(() => db.upsertProjectTask(this.state.currentProjectId, task))
+      .then(() => {
+        this.closeProjectTaskModal();
+        this.renderProjects();
+      })
+      .catch(error => {
+        console.error('Erro ao salvar tarefa de projeto:', error);
+        alert('Erro ao salvar tarefa de projeto: ' + error.message + '. Verifique o console para detalhes.');
+      });
   },
 
   deleteProjectTask(projectId, taskId) {
@@ -1140,49 +1434,77 @@ const app = {
         this.renderProjects();
       }
     }
+    db.deleteProjectTask(taskId).catch(console.error); // SUPABASE
   },
 
   startTimer(projectId, taskId) {
     const project = this.state.projects.find(p => p.id === projectId);
+    if (!project) return;
+
     const task = project.tasks.find(t => t.id === taskId);
-    
-    if (task && !task.isRunning) {
-      task.isRunning = true;
-      task.startTime = Date.now();
-      this.state.timers[taskId] = setInterval(() => this.updateTimer(projectId, taskId), 1000);
-      this.renderProjects();
-    }
+    if (!task || task.isRunning || task.state === 'concluida') return;
+
+    task.isRunning = true;
+    task.startTime = Date.now();
+
+    db.upsertProject(project)
+      .then(() => db.upsertProjectTask(projectId, task))
+      .then(() => {
+        this.renderProjects();
+      })
+      .catch(error => {
+        console.error('Erro ao iniciar timer:', error);
+        alert('Erro ao iniciar timer: ' + error.message + '. Verifique o console para detalhes.');
+      });
   },
 
   pauseTimer(projectId, taskId) {
     const project = this.state.projects.find(p => p.id === projectId);
+    if (!project) return;
+
     const task = project.tasks.find(t => t.id === taskId);
-    
-    if (task && task.isRunning) {
-      task.timeSpent += Date.now() - task.startTime;
-      task.isRunning = false;
-      task.startTime = null;
-      clearInterval(this.state.timers[taskId]);
-      delete this.state.timers[taskId];
-      this.renderProjects();
-    }
+    if (!task || !task.isRunning) return;
+
+    task.timeSpent += Date.now() - task.startTime;
+    task.isRunning = false;
+    task.startTime = null;
+    task.state = 'pausada';
+
+    db.upsertProject(project)
+      .then(() => db.upsertProjectTask(projectId, task))
+      .then(() => {
+        this.renderProjects();
+      })
+      .catch(error => {
+        console.error('Erro ao pausar timer:', error);
+        alert('Erro ao pausar timer: ' + error.message + '. Verifique o console para detalhes.');
+      });
   },
 
   finishTimer(projectId, taskId) {
     const project = this.state.projects.find(p => p.id === projectId);
+    if (!project) return;
+
     const task = project.tasks.find(t => t.id === taskId);
-    
-    if (task) {
-      if (task.isRunning) {
-        task.timeSpent += Date.now() - task.startTime;
-        task.isRunning = false;
-        task.startTime = null;
-        clearInterval(this.state.timers[taskId]);
-        delete this.state.timers[taskId];
-      }
-      task.state = 'concluida';
-      this.renderProjects();
+    if (!task) return;
+
+    if (task.isRunning) {
+      task.timeSpent += Date.now() - task.startTime;
+      task.isRunning = false;
+      task.startTime = null;
     }
+
+    task.state = 'concluida';
+
+    db.upsertProject(project)
+      .then(() => db.upsertProjectTask(projectId, task))
+      .then(() => {
+        this.renderProjects();
+      })
+      .catch(error => {
+        console.error('Erro ao finalizar tarefa:', error);
+        alert('Erro ao finalizar tarefa: ' + error.message + '. Verifique o console para detalhes.');
+      });
   },
 
   updateTimer(projectId, taskId) {
@@ -1213,7 +1535,7 @@ const app = {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   },
 
-  renderProjects() {
+    renderProjects() {
     const container = document.getElementById('projectsList');
     if (!container) return;
 
@@ -1242,9 +1564,9 @@ const app = {
               ${project.description ? `<p>${project.description}</p>` : ''}
             </div>
             <div style="display: flex; gap: var(--space-8);">
-              <button class="btn btn--sm btn--primary" onclick="app.openProjectTaskModal(${project.id})">+ Tarefa</button>
-              <button class="btn btn--sm btn--secondary" onclick="app.openProjectModal(${project.id})">✏️</button>
-              <button class="btn btn--sm btn--secondary" onclick="app.deleteProject(${project.id})">🗑️</button>
+              <button class="btn btn--sm btn--primary" onclick="app.openProjectTaskModal('${project.id}')">+ Tarefa</button>  <!-- Correção: Aspas ao redor do id -->
+              <button class="btn btn--sm btn--secondary" onclick="app.openProjectModal('${project.id}')">✏️</button>  <!-- Correção: Aspas ao redor do id -->
+              <button class="btn btn--sm btn--secondary" onclick="app.deleteProject('${project.id}')">🗑️</button>  <!-- Correção: Aspas ao redor do id -->
             </div>
           </div>
           
@@ -1274,13 +1596,13 @@ const app = {
               <div class="project-task-controls">
                 <div class="timer-display">⏱️ ${this.formatTime(currentTime)}</div>
                 ${!task.isRunning && task.state !== 'concluida' ? 
-                  `<button class="btn btn--sm btn--primary" onclick="app.startTimer(${project.id}, ${task.id})">▶️ Iniciar</button>` : ''}
+                  `<button class="btn btn--sm btn--primary" onclick="app.startTimer('${project.id}', '${task.id}')">▶️ Iniciar</button>` : ''}  <!-- Correção: Aspas ao redor dos ids -->
                 ${task.isRunning ? 
-                  `<button class="btn btn--sm btn--secondary" onclick="app.pauseTimer(${project.id}, ${task.id})">⏸️ Pausar</button>` : ''}
+                  `<button class="btn btn--sm btn--secondary" onclick="app.pauseTimer('${project.id}', '${task.id}')">⏸️ Pausar</button>` : ''}  <!-- Correção: Aspas ao redor dos ids -->
                 ${task.state !== 'concluida' ? 
-                  `<button class="btn btn--sm btn--primary" onclick="app.finishTimer(${project.id}, ${task.id})">✓ Finalizar</button>` : ''}
-                <button class="btn btn--sm btn--secondary" onclick="app.openProjectTaskModal(${project.id}, ${task.id})">✏️</button>
-                <button class="btn btn--sm btn--secondary" onclick="app.deleteProjectTask(${project.id}, ${task.id})">🗑️</button>
+                  `<button class="btn btn--sm btn--primary" onclick="app.finishTimer('${project.id}', '${task.id}')">✓ Finalizar</button>` : ''}  <!-- Correção: Aspas ao redor dos ids -->
+                <button class="btn btn--sm btn--secondary" onclick="app.openProjectTaskModal('${project.id}', '${task.id}')">✏️</button>  <!-- Correção: Aspas ao redor dos ids -->
+                <button class="btn btn--sm btn--secondary" onclick="app.deleteProjectTask('${project.id}', '${task.id}')">🗑️</button>  <!-- Correção: Aspas ao redor dos ids -->
               </div>
             </div>
           `;
@@ -1312,33 +1634,53 @@ const app = {
     const now = new Date();
     const notificationTime = this.state.settings.notificationTime;
 
-    this.state.tasks.forEach(task => {
-      if (!task.alarm || task.status === 'concluida') return;
+      this.state.tasks.forEach(task => {
+    if (!task.date) return;
 
-      const taskDate = this.parseLocalDate(task.date);
-      if (task.time) {
-        const [hours, minutes] = task.time.split(':').map(Number);
-        taskDate.setHours(hours, minutes);
-      }
-      const timeDiff = taskDate - now;
-      const minutesDiff = Math.floor(timeDiff / 60000);
+    const taskDate = this.parseLocalDate(task.date);
+    if (task.time) {
+      const [hours, minutes] = task.time.split(':').map(Number);
+      taskDate.setHours(hours, minutes);
+    }
 
-      if (minutesDiff === notificationTime) {
-        this.showNotification(task);
-      }
-    });
+    const now = new Date();
+    const timeDiff = taskDate - now;
+    const minutesDiff = Math.floor(timeDiff / 60000);
 
-    this.state.exams.forEach(exam => {
+    // não notifica itens já passados
+    if (minutesDiff < 0) return;
+
+    if (minutesDiff === notificationTime && !this.state.notified.tasks[task.id]) {
+      this.showNotification(task);
+      this.state.notified.tasks[task.id] = true; // marca como notificado
+    }
+  });
+
+
+        this.state.exams.forEach(exam => {
+      if (!exam.date) return;
+
       const examDate = this.parseLocalDate(exam.date);
       if (exam.time) {
         const [hours, minutes] = exam.time.split(':').map(Number);
         examDate.setHours(hours, minutes);
       }
-      const timeDiff = examDate - now;
-      const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
 
-      if (daysDiff === 1 || daysDiff === 0) {
-        this.showExamNotification(exam);
+      const now = new Date();
+      const timeDiff = examDate - now;
+      const minutesDiff = Math.floor(timeDiff / 60000);
+
+      if (minutesDiff < 0) return;
+
+      if (minutesDiff === notificationTime && !this.state.notified.exams[exam.id]) {
+        // use a mesma função de alerta que você já usa
+        alert(
+          `📋 Lembrete de Exame: ${exam.type}\n\n` +
+          `Data: ${exam.date}\n` +
+          `Horário: ${exam.time || '--:--'}\n` +
+          `Local: ${exam.location || '-'}`
+        );
+        this.state.notified.exams[exam.id] = true; // marca como notificado
       }
     });
   },
