@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDUCAR - Sistema de Gestão Escolar</title>
+    <link rel="stylesheet" href="educar.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="48" height="48" rx="12" fill="#1e40af"/>
+                        <path d="M24 12L14 18V28C14 33 18 37 24 40C30 37 34 33 34 28V18L24 12Z" fill="white"/>
+                        <path d="M20 24L22.5 26.5L28 21" stroke="#1e40af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <h1>EDUCAR</h1>
+                </div>
+                <p class="subtitle">Sistema de Gestão Escolar</p>
+            </div>
+
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="email" class="form-label">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                            <polyline points="22,6 12,13 2,6"/>
+                        </svg>
+                        E-mail
+                    </label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        class="form-control" 
+                        placeholder="seu.email@educar.com"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password" class="form-label">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                        Senha
+                    </label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        class="form-control" 
+                        placeholder="••••••••"
+                        required
+                    >
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">
+                    Entrar
+                </button>
+            </form>
+
+            <div class="test-users">
+                <p class="test-users-title">Use um dos usuários padrão para testar o sistema:</p>
+                <div class="test-users-list">
+                    <div class="test-user-item" onclick="fillLogin('secretaria@educar.com', 'secretaria')">
+                        <span class="user-icon">👤</span>
+                        <div class="user-info">
+                            <strong>Secretaria</strong>
+                            <span>secretaria@educar.com / secretaria</span>
+                        </div>
+                    </div>
+                    <div class="test-user-item" onclick="fillLogin('diretor@educar.com', 'diretor')">
+                        <span class="user-icon">👨‍💼</span>
+                        <div class="user-info">
+                            <strong>Diretor</strong>
+                            <span>diretor@educar.com / diretor</span>
+                        </div>
+                    </div>
+                    <div class="test-user-item" onclick="fillLogin('prof.maria@educar.com', 'professor')">
+                        <span class="user-icon">👩‍🏫</span>
+                        <div class="user-info">
+                            <strong>Professora Maria</strong>
+                            <span>prof.maria@educar.com / professor</span>
+                        </div>
+                    </div>
+                    <div class="test-user-item" onclick="fillLogin('aluno.joao@educar.com', 'aluno')">
+                        <span class="user-icon">👨‍🎓</span>
+                        <div class="user-info">
+                            <strong>Aluno João</strong>
+                            <span>aluno.joao@educar.com / aluno</span>
+                        </div>
+                    </div>
+                    <div class="test-user-item" onclick="fillLogin('pai.joao@educar.com', 'responsavel')">
+                        <span class="user-icon">👨‍👩‍👦</span>
+                        <div class="user-info">
+                            <strong>Responsável (Pai do João)</strong>
+                            <span>pai.joao@educar.com / responsavel</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="login-footer">
+                <p>Sistema EDUCAR – ©2025</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script>
+        function fillLogin(email, password) {
+            document.getElementById('email').value = email;
+            document.getElementById('password').value = password;
+        }
+    </script>
+</body>
+</html>
