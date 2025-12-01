@@ -421,6 +421,9 @@ const app = {
 
     // 2. Re-render current tab with loaded data
     this.switchTab(this.state.currentTab);
+
+    // Update settings UI with loaded values
+    this.renderSettings();
   },
 
   // Refresh data from database (sync across devices)
@@ -1863,9 +1866,24 @@ const app = {
       concluida: 'Concluída'
     };
     return labels[state] || state;
+    return labels[state] || state;
   },
 
   // Settings functions
+  renderSettings() {
+    if (!this.state.settings) return;
+
+    const soundInput = document.getElementById('notificationSound');
+    const viewInput = document.getElementById('defaultCalendarView');
+    const notifyInput = document.getElementById('enableNotifications');
+    const timeInput = document.getElementById('notificationTime');
+
+    if (soundInput) soundInput.value = this.state.settings.notificationSound || 'bell';
+    if (viewInput) viewInput.value = this.state.settings.defaultCalendarView || 'month';
+    if (notifyInput) notifyInput.checked = this.state.settings.enableNotifications !== false;
+    if (timeInput) timeInput.value = this.state.settings.notificationTime || 15;
+  },
+
   saveSettings() {
     const settings = {
       notificationSound: document.getElementById('notificationSound').value,
