@@ -1,4 +1,5 @@
 // ===== Supabase Adapter (apenas camada de dados; não muda UI) =====
+// versão: 2025-12-01 - small update para gerar novo commit
 const db = {
   client: null,
   init() {
@@ -354,11 +355,36 @@ const app = {
     }
   },
 
+  // Request notification permission
+  async requestNotificationPermission() {
+    if (!('Notification' in window)) {
+      console.warn('Este navegador não suporta notificações');
+      return false;
+    }
+
+    console.log('Current permission:', Notification.permission);
+
+    if (Notification.permission === 'granted') {
+      return true;
+    }
+
+    if (Notification.permission !== 'denied') {
+      const permission = await Notification.requestPermission();
+      console.log('New permission:', permission);
+      return permission === 'granted';
+    }
+
+    return false;
+  },
+
   // Initialize app
   async init() {
     // 1. Restore saved tab IMMEDIATELY (Visual switch before data load)
     const savedTab = localStorage.getItem('agenda_current_tab') || 'tarefas';
     this.switchTab(savedTab);
+
+    // Request notification permission
+    await this.requestNotificationPermission();
 
     // 2. Apply saved theme IMMEDIATELY (before data load to avoid flash)
     const savedTheme = localStorage.getItem('agenda_theme') || 'light';
@@ -1840,69 +1866,93 @@ const app = {
   },
 
   // Notifications
+  // Notifications
   checkNotifications() {
     if (!this.state.settings.enableNotifications) return;
+    if (Notification.permission !== 'granted') return;
 
     const now = new Date();
     const notificationTime = this.state.settings.notificationTime;
 
+    // Check tasks
     this.state.tasks.forEach(task => {
-      if (!task.date) return;
+      if (!task.date || !task.time) return;
 
-      const taskDate = this.parseLocalDate(task.date);
-      if (task.time) {
-        const [hours, minutes] = task.time.split(':').map(Number);
-        taskDate.setHours(hours, minutes);
-      }
-
-      const now = new Date();
-      const timeDiff = taskDate - now;
+      const taskDateTime = new Date(`${task.date}T${task.time}`);
+      const timeDiff = taskDateTime - now;
       const minutesDiff = Math.floor(timeDiff / 60000);
 
-      // não notifica itens já passados
-      if (minutesDiff < 0) return;
-
-      if (minutesDiff === notificationTime && !this.state.notified.tasks[task.id]) {
-        this.showNotification(task);
-        this.state.notified.tasks[task.id] = true; // marca como notificado
+      if (minutesDiff === notificationTime && minutesDiff > 0 && !this.state.notified.tasks[task.id]) {
+        this.showNotification('Lembrete de Tarefa', {
+          body: `${task.title} - ${task.time}`,
+          icon: 'logo.png',
+          badge: 'logo.png',
+          tag: `task-${task.id}`,
+          requireInteraction: false
+        });
+        this.state.notified.tasks[task.id] = true;
       }
     });
 
-
+    // Check exams
     this.state.exams.forEach(exam => {
-      if (!exam.date) return;
+      if (!exam.date || !exam.time) return;
 
-      const examDate = this.parseLocalDate(exam.date);
-      if (exam.time) {
-        const [hours, minutes] = exam.time.split(':').map(Number);
-        examDate.setHours(hours, minutes);
-      }
-
-      const now = new Date();
-      const timeDiff = examDate - now;
+      const examDateTime = new Date(`${exam.date}T${exam.time}`);
+      const timeDiff = examDateTime - now;
       const minutesDiff = Math.floor(timeDiff / 60000);
 
-      if (minutesDiff < 0) return;
-
-      if (minutesDiff === notificationTime && !this.state.notified.exams[exam.id]) {
-        // use a mesma função de alerta que você já usa
-        alert(
-          `📋 Lembrete de Exame: ${exam.type}\n\n` +
-          `Data: ${exam.date}\n` +
-          `Horário: ${exam.time || '--:--'}\n` +
-          `Local: ${exam.location || '-'}`
-        );
-        this.state.notified.exams[exam.id] = true; // marca como notificado
+      if (minutesDiff === notificationTime && minutesDiff > 0 && !this.state.notified.exams[exam.id]) {
+        this.showNotification('Lembrete de Exame', {
+          body: `${exam.type} - ${exam.time}\nLocal: ${exam.location || '-'}`,
+          icon: 'logo.png',
+          badge: 'logo.png',
+          tag: `exam-${exam.id}`,
+          requireInteraction: true
+        });
+        this.state.notified.exams[exam.id] = true;
       }
     });
   },
 
-  showNotification(task) {
-    alert(`🔔 Lembrete: ${task.title}\n\nA tarefa está próxima!\nData: ${this.formatDateStr(task.date)}${task.time ? '\nHorário: ' + task.time : ''}`);
+  showNotification(title, options) {
+    console.log('Showing notification:', title, options);
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      console.log('Using Service Worker for notification');
+      navigator.serviceWorker.ready.then(registration => {
+        registration.showNotification(title, options);
+      }).catch(err => console.error('SW notification error:', err));
+    } else {
+      console.log('Using Notification API directly');
+      try {
+        new Notification(title, options);
+      } catch (e) {
+        console.error('Notification API error:', e);
+        // Fallback to alert if notification fails
+        alert(`🔔 ${title}\n${options.body}`);
+      }
+    }
   },
 
-  showExamNotification(exam) {
-    alert(`🏥 Lembrete de Exame: ${exam.type}\n\nData: ${this.formatDateStr(exam.date)}${exam.time ? '\nHorário: ' + exam.time : ''}${exam.location ? '\nLocal: ' + exam.location : ''}`);
+  testNotification() {
+    console.log('Testing notification...');
+    if (Notification.permission !== 'granted') {
+      this.requestNotificationPermission().then(granted => {
+        if (granted) {
+          this.showNotification('Teste de Notificação', {
+            body: 'As notificações estão funcionando!',
+            icon: 'logo.png'
+          });
+        } else {
+          alert('Permissão de notificação negada.');
+        }
+      });
+    } else {
+      this.showNotification('Teste de Notificação', {
+        body: 'As notificações estão funcionando!',
+        icon: 'logo.png'
+      });
+    }
   },
 
   // Pomodoro Timer Functions
