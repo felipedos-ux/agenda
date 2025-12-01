@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minha Agenda</title>
+
+    <!-- PWA Configuration -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#21808d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Minha Agenda">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header with Theme Toggle -->
+        <header class="app-header">
+            <button class="hamburger-btn" id="hamburgerBtn" aria-label="Menu">
+                ☰
+            </button>
+            <h1>📅 Minha Agenda</h1>
+            <button id="themeToggle" class="btn btn--secondary btn--sm" aria-label="Alternar tema">
+                <span id="themeIcon">🌙</span>
+            </button>
+        </header>
+
+        <!-- Side Menu Overlay (Mobile Only) -->
+        <div id="sideMenuOverlay" class="side-menu-overlay"></div>
+
+        <!-- Side Menu (Mobile Only) -->
+        <nav id="sideMenu" class="side-menu">
+            <div class="side-menu-header">
+                <h2>Menu</h2>
+                <button id="closeSideMenu" class="side-menu-close" aria-label="Fechar menu">&times;</button>
+            </div>
+            <div class="side-menu-items">
+                <button class="side-menu-item active" data-tab="tarefas">✓ Tarefas</button>
+                <button class="side-menu-item" data-tab="agenda">📅 Agenda</button>
+                <button class="side-menu-item" data-tab="compras">🛒 Compras</button>
+                <button class="side-menu-item" data-tab="exames">🏥 Exames</button>
+                <button class="side-menu-item" data-tab="projetos">📊 Projetos</button>
+                <button class="side-menu-item" data-tab="configuracoes">⚙️ Config</button>
+            </div>
+        </nav>
+
+        <!-- Tab Navigation (Desktop Only) -->
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="tarefas">✓ Tarefas</button>
+            <button class="tab-btn" data-tab="agenda">📅 Agenda</button>
+            <button class="tab-btn" data-tab="compras">🛒 Compras</button>
+            <button class="tab-btn" data-tab="exames">🏥 Exames</button>
+            <button class="tab-btn" data-tab="projetos">📊 Projetos</button>
+            <button class="tab-btn" data-tab="foco">🎯 Foco</button>
+            <button class="tab-btn" data-tab="configuracoes">⚙️ Config</button>
+        </nav>
+
+        <!-- Tab Content Container -->
+        <main class="tab-content-container">
+            <!-- TAREFAS TAB -->
+            <section id="tarefas-tab" class="tab-content active">
+                <div class="section-header">
+                    <h2>Minhas Tarefas</h2>
+                </div>
+
+                <!-- Quick Add Task Form -->
+                <div class="card quick-task-card">
+                    <div class="card__body">
+                        <h3 style="margin-bottom: var(--space-16); font-size: var(--font-size-lg);">➕ Adicionar Tarefa
+                            Rápida</h3>
+                        <div class="quick-task-form">
+                            <input type="text" id="quickTaskTitle" placeholder="Título da tarefa" class="form-control"
+                                style="margin-bottom: var(--space-8);">
+                            <textarea id="quickTaskDescription" placeholder="Descrição (opcional)" class="form-control"
+                                rows="2" style="margin-bottom: var(--space-8);"></textarea>
+                            <div class="quick-task-inputs">
+                                <input type="date" id="quickTaskDate" class="form-control">
+                                <input type="time" id="quickTaskTime" class="form-control">
+                                <select id="quickTaskPriority" class="form-control">
+                                    <option value="baixa">🟢 Baixa</option>
+                                    <option value="normal" selected>🟡 Normal</option>
+                                    <option value="urgente">🔴 Urgente</option>
+                                </select>
+                            </div>
+                            <button class="btn btn--primary btn--full-width" onclick="app.addQuickTask()">✓ Adicionar
+                                Tarefa</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Controls -->
+                <div class="task-filters">
+                    <div>
+                        <label
+                            style="font-weight: var(--font-weight-medium); font-size: var(--font-size-sm); margin-right: var(--space-8);">Filtrar:</label>
+                        <select id="taskStatusFilter" onchange="app.filterTasksView()" class="form-control"
+                            style="display: inline-block; width: auto; min-width: 150px;">
+                            <option value="all">Todos</option>
+                            <option value="pendente">Pendente</option>
+                            <option value="andamento">Em Andamento</option>
+                            <option value="concluida">Concluída</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label
+                            style="font-weight: var(--font-weight-medium); font-size: var(--font-size-sm); margin-right: var(--space-8);">Prioridade:</label>
+                        <select id="taskPriorityFilter" onchange="app.filterTasksView()" class="form-control"
+                            style="display: inline-block; width: auto; min-width: 150px;">
+                            <option value="all">Todas</option>
+                            <option value="urgente">🔴 Urgente</option>
+                            <option value="normal">🟡 Normal</option>
+                            <option value="baixa">🟢 Baixa</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Upcoming Exams Section -->
+                <div id="upcomingExamsSection" class="upcoming-exams-section"></div>
+
+                <!-- Tasks Dashboard -->
+                <div class="tasks-dashboard">
+                    <div class="tasks-column">
+                        <h3 class="tasks-column-header"
+                            style="background-color: var(--color-bg-2); color: var(--color-text); border-bottom-color: rgba(180, 83, 9, 0.3);">
+                            📋 Pendentes</h3>
+                        <div id="pendenteTasksList" class="tasks-column-list"></div>
+                    </div>
+                    <div class="tasks-column">
+                        <h3 class="tasks-column-header"
+                            style="background-color: var(--color-bg-1); color: var(--color-text); border-bottom-color: rgba(29, 78, 216, 0.3);">
+                            🔄 Em Andamento</h3>
+                        <div id="andamentoTasksList" class="tasks-column-list"></div>
+                    </div>
+                    <div class="tasks-column">
+                        <h3 class="tasks-column-header"
+                            style="background-color: var(--color-bg-3); color: var(--color-text); border-bottom-color: rgba(21, 128, 61, 0.3);">
+                            ✓ Concluídas</h3>
+                        <div id="concluidaTasksList" class="tasks-column-list"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- AGENDA TAB -->
+            <section id="agenda-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Agenda e Calendário</h2>
+                    <button class="btn btn--primary" onclick="app.openTaskModal()">+ Nova Tarefa</button>
+                </div>
+
+                <!-- Calendar View Toggle -->
+                <div class="view-toggle">
+                    <button class="btn btn--sm" onclick="app.changeCalendarView('month')">Mês</button>
+                    <button class="btn btn--sm" onclick="app.changeCalendarView('week')">Semana</button>
+                </div>
+
+                <!-- Filter Tasks -->
+                <div class="filter-controls">
+                    <label>Filtrar por status:</label>
+                    <select id="statusFilter" onchange="app.filterTasks()" class="form-control">
+                        <option value="all">Todos</option>
+                        <option value="pendente">Pendente</option>
+                        <option value="andamento">Em Andamento</option>
+                        <option value="concluida">Concluída</option>
+                    </select>
+                </div>
+
+                <!-- Calendar Display -->
+                <div id="calendarDisplay" class="calendar-display"></div>
+
+                <!-- Tasks List -->
+                <div id="tasksList" class="tasks-list"></div>
+            </section>
+
+            <!-- COMPRAS TAB -->
+            <section id="compras-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Listas de Compras</h2>
+                </div>
+
+                <!-- Shopping List Type Toggle -->
+                <div class="shopping-toggle">
+                    <button class="btn shop-type-btn active" onclick="app.switchShoppingList('supermercado')">🛒
+                        Supermercado</button>
+                    <button class="btn shop-type-btn" onclick="app.switchShoppingList('farmacia')">💊 Farmácia</button>
+                </div>
+
+                <!-- Supermercado List -->
+                <div id="supermercado-list" class="shopping-list active">
+                    <h3>🛒 Lista de Supermercado</h3>
+                    <div class="add-item-form">
+                        <input type="text" id="super-item" placeholder="Nome do item" class="form-control">
+                        <input type="number" id="super-qty" placeholder="Qtd" min="1" value="1"
+                            class="form-control qty-input">
+                        <input type="number" id="super-price" placeholder="Preço (R$)" min="0" step="0.01"
+                            class="form-control price-input">
+                        <button class="btn btn--primary"
+                            onclick="app.addShoppingItem('supermercado')">Adicionar</button>
+                    </div>
+                    <div id="supermercado-items" class="shopping-items"></div>
+                    <div class="shopping-total">
+                        <strong>Total Estimado: R$ <span id="supermercado-total">0.00</span></strong>
+                    </div>
+                </div>
+
+                <!-- Farmácia List -->
+                <div id="farmacia-list" class="shopping-list">
+                    <h3>💊 Lista de Farmácia</h3>
+                    <div class="add-item-form">
+                        <input type="text" id="farm-item" placeholder="Nome do item" class="form-control">
+                        <input type="number" id="farm-qty" placeholder="Qtd" min="1" value="1"
+                            class="form-control qty-input">
+                        <input type="number" id="farm-price" placeholder="Preço (R$)" min="0" step="0.01"
+                            class="form-control price-input">
+                        <button class="btn btn--primary" onclick="app.addShoppingItem('farmacia')">Adicionar</button>
+                    </div>
+                    <div id="farmacia-items" class="shopping-items"></div>
+                    <div class="shopping-total">
+                        <strong>Total Estimado: R$ <span id="farmacia-total">0.00</span></strong>
+                    </div>
+                </div>
+            </section>
+
+            <!-- EXAMES TAB -->
+            <section id="exames-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Exames Médicos</h2>
+                    <button class="btn btn--primary" onclick="app.openExamModal()">+ Novo Exame</button>
+                </div>
+                <div id="examesList" class="exames-list"></div>
+            </section>
+
+            <!-- PROJETOS TAB -->
+            <section id="projetos-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Gerenciamento de Projetos</h2>
+                    <button class="btn btn--primary" onclick="app.openProjectModal()">+ Novo Projeto</button>
+                </div>
+                <div id="projectsList" class="projects-list"></div>
+            </section>
+
+            <!-- FOCO TAB -->
+            <section id="foco-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>🎯 Foco - Pomodoro</h2>
+                </div>
+
+                <!-- Audio Controls -->
+                <div class="card"
+                    style="margin-bottom: var(--space-24); background-color: var(--color-bg-1); border: 2px solid var(--color-primary);">
+                    <div class="card__body">
+                        <h3 style="margin-bottom: var(--space-8); font-size: var(--font-size-lg);">🎵 Áudio - Pomodoro
+                            25/5 com Ruído Azul para TDAH</h3>
+                        <p
+                            style="margin-bottom: var(--space-16); font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                            🧠 Este <strong>áudio especializado</strong> de ruído azul é perfeito para concentração e
+                            foco. O áudio sincroniza automaticamente com o temporizador Pomodoro.
+                        </p>
+
+                        <div class="audio-controls-grid">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Volume: <span id="volumeValue">70%</span></label>
+                                <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="70"
+                                    oninput="app.changeVolume(this.value)">
+                            </div>
+                        </div>
+
+                        <div
+                            style="display: flex; gap: var(--space-8); margin-top: var(--space-16); flex-wrap: wrap; align-items: center;">
+                            <button id="audioToggleBtn" class="btn btn--primary btn--sm" onclick="app.toggleAudio()">
+                                <span id="audioToggleIcon">🔊</span> <span id="audioToggleText">Áudio Ativado</span>
+                            </button>
+                            <div
+                                style="flex: 1; min-width: 200px; display: flex; align-items: center; gap: var(--space-8); font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                                <span id="audioStatusText">✅ Pronto! Clique em "Iniciar" para começar</span>
+                            </div>
+                        </div>
+                        <div
+                            style="margin-top: var(--space-12); padding: var(--space-12); background-color: var(--color-bg-2); border-radius: var(--radius-base); font-size: var(--font-size-xs); color: var(--color-text-secondary);">
+                            🎵 Áudio: Ruído Azul Pomodoro para TDAH - pomodoro.mp3
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pomodoro Settings -->
+                <div class="card" style="margin-bottom: var(--space-24);">
+                    <div class="card__body">
+                        <h3 style="margin-bottom: var(--space-16); font-size: var(--font-size-lg);">⚙️ Configurações do
+                            Temporizador</h3>
+                        <div
+                            style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-16); margin-bottom: var(--space-16);">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Tempo de Concentração (minutos):</label>
+                                <input type="number" id="focusTime" class="form-control" value="25" min="1" max="120">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Tempo de Descanso (minutos):</label>
+                                <input type="number" id="breakTime" class="form-control" value="5" min="1" max="60">
+                            </div>
+                        </div>
+                        <button class="btn btn--secondary btn--sm" onclick="app.applyPomodoroSettings()">✓ Aplicar
+                            Configurações</button>
+                    </div>
+                </div>
+
+                <!-- Pomodoro Timer Container -->
+                <div id="pomodoroContainer" class="pomodoro-container">
+                    <div class="pomodoro-overlay">
+                        <div class="pomodoro-content">
+                            <div class="pomodoro-mode-indicator">
+                                <span id="pomodoroModeText">Concentração</span>
+                            </div>
+
+                            <div class="pomodoro-timer-display">
+                                <div id="pomodoroTimer" class="timer-text">25:00</div>
+                            </div>
+
+                            <div class="pomodoro-controls">
+                                <button id="pomodoroStartBtn" class="btn btn--primary btn-pomodoro"
+                                    onclick="app.startPomodoro()">
+                                    ▶️ Iniciar
+                                </button>
+                                <button id="pomodoroPauseBtn" class="btn btn--secondary btn-pomodoro"
+                                    onclick="app.pausePomodoro()" style="display: none;">
+                                    ⏸️ Pausar
+                                </button>
+                                <button id="pomodoroResetBtn" class="btn btn--secondary btn-pomodoro"
+                                    onclick="app.resetPomodoro()">
+                                    ↺ Resetar
+                                </button>
+                            </div>
+
+                            <div class="pomodoro-info">
+                                <p
+                                    style="margin: 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); text-align: center;">
+                                    Use o método Pomodoro para manter o foco e produtividade!
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CONFIGURAÇÕES TAB -->
+            <section id="configuracoes-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Configurações</h2>
+                </div>
+
+                <div class="card">
+                    <div class="card__body">
+                        <h3>Sons de Notificação</h3>
+                        <div class="form-group">
+                            <label class="form-label">Som de Alarme para Tarefas:</label>
+                            <select id="notificationSound" class="form-control">
+                                <option value="bell">🔔 Sino</option>
+                                <option value="chime">🎵 Melodia</option>
+                                <option value="beep">📢 Bip</option>
+                                <option value="alert">⚠️ Alerta</option>
+                            </select>
+                        </div>
+
+                        <h3 style="margin-top: var(--space-24);">Preferências de Exibição</h3>
+                        <div class="form-group">
+                            <label class="form-label">Vista Padrão do Calendário:</label>
+                            <select id="defaultCalendarView" class="form-control">
+                                <option value="month">Mensal</option>
+                                <option value="week">Semanal</option>
+                            </select>
+                        </div>
+
+                        <h3 style="margin-top: var(--space-24);">Notificações</h3>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <input type="checkbox" id="enableNotifications" checked>
+                                Ativar notificações automáticas
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Antecipar notificação em (minutos):</label>
+                            <input type="number" id="notificationTime" class="form-control" value="15" min="0">
+                        </div>
+
+                        <div class="form-group">
+                            <button class="btn btn--primary btn--full-width" onclick="app.saveSettings()">
+                                💾 Salvar Configurações
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal for Adding/Editing Tasks -->
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="taskModalTitle">Nova Tarefa</h3>
+                <button class="modal-close" onclick="app.closeTaskModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Título:</label>
+                    <input type="text" id="taskTitle" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Descrição:</label>
+                    <textarea id="taskDescription" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data:</label>
+                    <input type="date" id="taskDate" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Horário:</label>
+                    <input type="time" id="taskTime" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Prioridade:</label>
+                    <select id="taskPriority" class="form-control">
+                        <option value="baixa">🟢 Baixa</option>
+                        <option value="normal" selected>🟡 Normal</option>
+                        <option value="urgente">🔴 Urgente</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status:</label>
+                    <select id="taskStatus" class="form-control">
+                        <option value="pendente" selected>Pendente</option>
+                        <option value="andamento">Em Andamento</option>
+                        <option value="concluida">Concluída</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" id="taskAlarm">
+                        Ativar alarme para esta tarefa
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--secondary" onclick="app.closeTaskModal()">Cancelar</button>
+                <button class="btn btn--primary" onclick="app.saveTask()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Adding/Editing Exams -->
+    <div id="examModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="examModalTitle">Novo Exame</h3>
+                <button class="modal-close" onclick="app.closeExamModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Tipo de Exame:</label>
+                    <input type="text" id="examType" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data:</label>
+                    <input type="date" id="examDate" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Horário:</label>
+                    <input type="time" id="examTime" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Local:</label>
+                    <input type="text" id="examLocation" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observações:</label>
+                    <textarea id="examNotes" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Anexar Arquivo (PDF/Imagem):</label>
+                    <input type="file" id="examFile" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                    <small style="color: var(--color-text-secondary);">Tipos aceitos: PDF, JPG, PNG</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--secondary" onclick="app.closeExamModal()">Cancelar</button>
+                <button class="btn btn--primary" onclick="app.saveExam()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Adding/Editing Projects -->
+    <div id="projectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="projectModalTitle">Novo Projeto</h3>
+                <button class="modal-close" onclick="app.closeProjectModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Nome do Projeto:</label>
+                    <input type="text" id="projectName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Descrição:</label>
+                    <textarea id="projectDescription" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--secondary" onclick="app.closeProjectModal()">Cancelar</button>
+                <button class="btn btn--primary" onclick="app.saveProject()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Adding/Editing Project Tasks -->
+    <div id="projectTaskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="projectTaskModalTitle">Nova Tarefa do Projeto</h3>
+                <button class="modal-close" onclick="app.closeProjectTaskModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Nome da Tarefa:</label>
+                    <input type="text" id="projectTaskName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Descrição:</label>
+                    <textarea id="projectTaskDescription" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estado:</label>
+                    <select id="projectTaskState" class="form-control">
+                        <option value="fazer" selected>A Fazer</option>
+                        <option value="pausada">Pausada</option>
+                        <option value="concluida">Concluída</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--secondary" onclick="app.closeProjectTaskModal()">Cancelar</button>
+                <button class="btn btn--primary" onclick="app.saveProjectTask()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SDK Supabase (UMD) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Configuração do Supabase -->
+    <script>
+        window.SUPABASE_URL = "https://vveeevendrxnbkfldifm.supabase.co";
+        window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2ZWVldmVuZHJ4bmJrZmxkaWZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0Mjg0MDQsImV4cCI6MjA3ODAwNDQwNH0.23wvn_ds7i_qhYBfPnNEVzLqw7A5ccJkpLdQ8NatDic";
+    </script>
+
+    <!-- App -->
+    <script src="app.js"></script>
+
+</body>
+
+</html>

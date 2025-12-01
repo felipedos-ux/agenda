@@ -1,0 +1,60 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.exams (
+  id text NOT NULL,
+  title text NOT NULL,
+  description text,
+  date date,
+  time time without time zone,
+  location text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT exams_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.project_tasks (
+  id text NOT NULL,
+  project_id text NOT NULL,
+  title text NOT NULL,
+  description text,
+  state text DEFAULT 'fazer'::text CHECK (state = ANY (ARRAY['fazer'::text, 'pausada'::text, 'concluida'::text])),
+  time_spent bigint DEFAULT 0,
+  is_running boolean DEFAULT false,
+  start_time bigint,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT project_tasks_pkey PRIMARY KEY (id),
+  CONSTRAINT project_tasks_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id)
+);
+CREATE TABLE public.projects (
+  id text NOT NULL,
+  name text NOT NULL,
+  description text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT projects_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.shopping_items (
+  id text NOT NULL,
+  list_type text NOT NULL CHECK (list_type = ANY (ARRAY['supermercado'::text, 'farmacia'::text])),
+  name text NOT NULL,
+  quantity numeric DEFAULT 1,
+  unit_price numeric,
+  purchased boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT shopping_items_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.tasks (
+  id text NOT NULL,
+  title text NOT NULL,
+  description text,
+  date date,
+  time time without time zone,
+  priority text DEFAULT 'normal'::text CHECK (priority = ANY (ARRAY['baixa'::text, 'normal'::text, 'urgente'::text])),
+  status text DEFAULT 'afazer'::text CHECK (status = ANY (ARRAY['afazer'::text, 'andamento'::text, 'concluida'::text])),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  alarm boolean DEFAULT false,
+  CONSTRAINT tasks_pkey PRIMARY KEY (id)
+);
