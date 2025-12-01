@@ -362,15 +362,12 @@ const app = {
       return false;
     }
 
-    console.log('Current permission:', Notification.permission);
-
     if (Notification.permission === 'granted') {
       return true;
     }
 
     if (Notification.permission !== 'denied') {
       const permission = await Notification.requestPermission();
-      console.log('New permission:', permission);
       return permission === 'granted';
     }
 
@@ -1916,14 +1913,11 @@ const app = {
   },
 
   showNotification(title, options) {
-    console.log('Showing notification:', title, options);
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      console.log('Using Service Worker for notification');
       navigator.serviceWorker.ready.then(registration => {
         registration.showNotification(title, options);
-      }).catch(err => console.error('SW notification error:', err));
+      });
     } else {
-      console.log('Using Notification API directly');
       try {
         new Notification(title, options);
       } catch (e) {
@@ -1935,7 +1929,6 @@ const app = {
   },
 
   testNotification() {
-    console.log('Testing notification...');
     if (Notification.permission !== 'granted') {
       this.requestNotificationPermission().then(granted => {
         if (granted) {
