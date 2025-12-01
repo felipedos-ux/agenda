@@ -412,11 +412,39 @@ const app = {
     this.renderTasks();
     this.checkNotifications();
     setInterval(() => this.checkNotifications(), 60000); // Check every minute
+
+    // Auto-refresh data every 2 minutes to sync across devices
+    setInterval(() => this.refreshData(), 120000);
+
     this.updateAllTimers();
     this.initPomodoro();
 
     // 2. Re-render current tab with loaded data
     this.switchTab(this.state.currentTab);
+  },
+
+  // Refresh data from database (sync across devices)
+  async refreshData() {
+    try {
+      const [tasks, exams] = await Promise.all([
+        db.loadTasks(),
+        db.loadExams()
+      ]);
+
+      this.state.tasks = tasks;
+      this.state.exams = exams;
+
+      // Update UI if on relevant tabs
+      if (this.state.currentTab === 'tarefas') {
+        this.renderTasks();
+      }
+      this.renderCalendar();
+
+      // Check notifications immediately after refresh
+      this.checkNotifications();
+    } catch (error) {
+      console.error('Erro ao sincronizar dados:', error);
+    }
   },
 
   // Set default dates to today (using local time to avoid timezone issues)
