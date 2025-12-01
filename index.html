@@ -389,6 +389,12 @@
                         </div>
 
                         <div class="form-group">
+                            <button class="btn btn--secondary btn--full-width" onclick="app.testNotification()">
+                                🔔 Testar Notificação
+                            </button>
+                        </div>
+
+                        <div class="form-group">
                             <button class="btn btn--primary btn--full-width" onclick="app.saveSettings()">
                                 💾 Salvar Configurações
                             </button>
@@ -562,6 +568,16 @@
     <!-- App -->
     <script src="app.js"></script>
 
+    <script>
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registrado'))
+                    .catch(err => console.error('Erro ao registrar SW:', err));
+            });
+        }
+    </script>
 </body>
 
 </html>
