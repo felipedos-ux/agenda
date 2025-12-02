@@ -985,7 +985,6 @@ const app = {
     const time = document.getElementById('taskTime').value;
     const priority = document.getElementById('taskPriority').value;
     const status = document.getElementById('taskStatus').value;
-    const alarm = document.getElementById('taskAlarm').checked;
 
     if (!title || !date) {
       alert('Por favor, preencha o título e a data.');
@@ -1000,7 +999,6 @@ const app = {
       time,
       priority,
       status,
-      alarm,
       createdAt: this.state.editingTask ? this.state.editingTask.createdAt : new Date().toISOString()
     };
 
@@ -2051,7 +2049,8 @@ const app = {
       const timeDiff = taskDateTime - now;
       const minutesDiff = Math.floor(timeDiff / 60000);
 
-      if (minutesDiff === notificationTime && minutesDiff > 0 && !this.state.notified.tasks[task.id]) {
+      // Use time window instead of exact match (0 to notificationTime)
+      if (minutesDiff > 0 && minutesDiff <= notificationTime && !this.state.notified.tasks[task.id]) {
         this.showNotification('Lembrete de Tarefa', {
           body: `${task.title} - ${task.time}`,
           icon: 'logo.png',
@@ -2060,6 +2059,8 @@ const app = {
           requireInteraction: false
         });
         this.state.notified.tasks[task.id] = true;
+        // Persist notification state in localStorage
+        localStorage.setItem(`notified_task_${task.id}`, 'true');
       }
     });
 
@@ -2071,7 +2072,8 @@ const app = {
       const timeDiff = examDateTime - now;
       const minutesDiff = Math.floor(timeDiff / 60000);
 
-      if (minutesDiff === notificationTime && minutesDiff > 0 && !this.state.notified.exams[exam.id]) {
+      // Use time window instead of exact match
+      if (minutesDiff > 0 && minutesDiff <= notificationTime && !this.state.notified.exams[exam.id]) {
         this.showNotification('Lembrete de Exame', {
           body: `${exam.type} - ${exam.time}\nLocal: ${exam.location || '-'}`,
           icon: 'logo.png',
@@ -2080,6 +2082,8 @@ const app = {
           requireInteraction: true
         });
         this.state.notified.exams[exam.id] = true;
+        // Persist notification state in localStorage
+        localStorage.setItem(`notified_exam_${exam.id}`, 'true');
       }
     });
   },
