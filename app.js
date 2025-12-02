@@ -963,7 +963,6 @@ const app = {
     document.getElementById('taskTime').value = task.time || '';
     document.getElementById('taskPriority').value = task.priority;
     document.getElementById('taskStatus').value = task.status;
-    document.getElementById('taskAlarm').checked = task.alarm;
   },
 
   clearTaskForm() {
