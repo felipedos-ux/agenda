@@ -413,8 +413,8 @@ const app = {
     this.checkNotifications();
     setInterval(() => this.checkNotifications(), 60000); // Check every minute
 
-    // Auto-refresh data every 2 minutes to sync across devices
-    setInterval(() => this.refreshData(), 120000);
+    // Setup Realtime subscriptions for instant sync
+    this.setupRealtimeSubscriptions();
 
     this.updateAllTimers();
     this.initPomodoro();
@@ -447,6 +447,132 @@ const app = {
       this.checkNotifications();
     } catch (error) {
       console.error('Erro ao sincronizar dados:', error);
+    }
+  },
+
+  // Setup Realtime subscriptions for instant synchronization
+  setupRealtimeSubscriptions() {
+    if (!db.client) {
+      console.warn('Supabase client not initialized, skipping Realtime setup');
+      return;
+    }
+
+    console.log('🔄 Setting up Realtime subscriptions...');
+
+    // Subscribe to tasks changes
+    db.client
+      .channel('tasks-channel')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks' },
+        (payload) => this.handleTaskChange(payload)
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Tasks Realtime active');
+        }
+      });
+
+    // Subscribe to exams changes
+    db.client
+      .channel('exams-channel')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'exams' },
+        (payload) => this.handleExamChange(payload)
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Exams Realtime active');
+        }
+      });
+
+    // Subscribe to projects changes
+    db.client
+      .channel('projects-channel')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'projects' },
+        (payload) => this.handleProjectChange(payload)
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Projects Realtime active');
+        }
+      });
+
+    // Subscribe to project_tasks changes
+    db.client
+      .channel('project-tasks-channel')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'project_tasks' },
+        (payload) => this.handleProjectTaskChange(payload)
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Project Tasks Realtime active');
+        }
+      });
+
+    // Subscribe to settings changes
+    db.client
+      .channel('settings-channel')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'user_settings' },
+        (payload) => this.handleSettingsChange(payload)
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Settings Realtime active');
+        }
+      });
+  },
+
+  // Handle task changes from Realtime
+  async handleTaskChange(payload) {
+    console.log('📝 Task change detected:', payload.eventType);
+    this.state.tasks = await db.loadTasks();
+    if (this.state.currentTab === 'tarefas') {
+      this.renderTasks();
+    }
+    this.renderCalendar();
+    this.checkNotifications();
+  },
+
+  // Handle exam changes from Realtime
+  async handleExamChange(payload) {
+    console.log('📋 Exam change detected:', payload.eventType);
+    this.state.exams = await db.loadExams();
+    this.renderCalendar();
+    this.checkNotifications();
+  },
+
+  // Handle project changes from Realtime
+  async handleProjectChange(payload) {
+    console.log('📁 Project change detected:', payload.eventType);
+    this.state.projects = await db.loadProjectsWithTasks();
+    if (this.state.currentTab === 'projetos') {
+      this.renderProjects();
+    }
+  },
+
+  // Handle project task changes from Realtime
+  async handleProjectTaskChange(payload) {
+    console.log('✅ Project task change detected:', payload.eventType);
+    this.state.projects = await db.loadProjectsWithTasks();
+    if (this.state.currentTab === 'projetos') {
+      this.renderProjects();
+    }
+  },
+
+  // Handle settings changes from Realtime
+  async handleSettingsChange(payload) {
+    console.log('⚙️ Settings change detected:', payload.eventType);
+    this.state.settings = await db.loadSettings();
+    this.renderSettings();
+
+    // Apply theme if changed
+    if (payload.new?.theme) {
+      document.documentElement.setAttribute('data-color-scheme', payload.new.theme);
+      document.getElementById('themeIcon').textContent = payload.new.theme === 'dark' ? '☀️' : '🌙';
+      localStorage.setItem('agenda_theme', payload.new.theme);
     }
   },
 
